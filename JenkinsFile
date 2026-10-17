@@ -1,6 +1,11 @@
 
 pipeline {
     agent any
+     environment {
+        SONARQUBE_URL = 'http://localhost:9000'
+        SONARQUBE_TOKEN = credentials('SonarQube')
+        DOCKER_IMAGE = "aminsaadouli8053/devops"
+    }
 
     triggers {
         githubPush()
@@ -34,6 +39,18 @@ pipeline {
                 sh 'mvn -B -DskipTests=true package'
     }
 }
+stage('SonarQube Analysis') {
+            steps {
+                sh """
+                    mvn sonar:sonar \
+                    -Dsonar.projectKey=student-management \
+                    -Dsonar.host.url=${SONARQUBE_URL} \
+                    -Dsonar.token=${SONARQUBE_TOKEN} \
+                    -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+                """
+            }
+        }
+
 
     }
 }
