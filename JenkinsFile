@@ -19,5 +19,21 @@ pipeline {
                 sh 'date'
             }
         }
+        stage('Clean') {
+            steps {
+                sh 'mvn -B clean'
+    }
+}
+  stage('Compile') {
+            steps {
+                sh 'mvn -B -DskipTests=true compile'
+    }
+}
+  stage('Package') {
+            steps {
+                sh 'mvn -B -DskipTests=true package'
+    }
+}
+
     }
 }
