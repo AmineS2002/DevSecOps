@@ -4,7 +4,7 @@ pipeline {
      environment {
         SONARQUBE_URL = 'http://localhost:9000'
         SONARQUBE_TOKEN = credentials('SonarQube')
-        DOCKER_IMAGE = "AmineS2002/devsecops"
+        DOCKER_IMAGE = "amineS2002/devsecops"
     }
 
     triggers {
