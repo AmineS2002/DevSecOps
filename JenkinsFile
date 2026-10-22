@@ -72,6 +72,21 @@ stage('SonarQube Analysis') {
                 sh 'docker push $DOCKER_IMAGE:latest'
             }
         }
+        stage('Deploy with Docker Compose') {
+            steps {
+                sh '''
+                    docker compose \
+                      --env-file /opt/student-management/.env \
+                      -f "$WORKSPACE/docker-compose.yml" \
+                      pull
+
+                    docker compose \
+                      --env-file /opt/student-management/.env \
+                      -f "$WORKSPACE/docker-compose.yml" \
+                      up -d
+                '''
+            }
+        }
 
 
 
