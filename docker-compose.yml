@@ -1,0 +1,14 @@
+
+services:
+  student-management:
+    image: amines2002/devsecops:latest
+    container_name: student-management
+    ports:
+      - "8089:8089"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:mysql://host.docker.internal:3306/studentdb"
+      SPRING_DATASOURCE_USERNAME: "${DB_USERNAME}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+    restart: unless-stopped
