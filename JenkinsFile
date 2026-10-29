@@ -28,6 +28,19 @@ pipeline {
             steps {
                 sh 'mvn -B clean'
     }
+    stage('SCA - OWASP Dependency-Check') {
+    steps {
+        withCredentials([
+            string(credentialsId: 'NVD_API_KEY',
+                   variable: 'NVD_API_KEY')
+        ]) {
+            sh '''
+                mvn -B org.owasp:dependency-check-maven:13.0.0:check \
+                    -DnvdApiKey="$NVD_API_KEY"
+            '''
+        }
+    }
+}
 }
   stage('Compile') {
             steps {
