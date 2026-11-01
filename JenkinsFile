@@ -37,9 +37,17 @@ stage('SCA - OWASP Dependency-Check') {
                    variable: 'NVD_API_KEY')
         ]) {
             sh '''
+                set +x
+
                 mvn -B org.owasp:dependency-check-maven:13.0.0:check \
                     -DnvdApiKey="$NVD_API_KEY"
             '''
+        }
+    }
+    post {
+        always {
+            archiveArtifacts artifacts: 'target/dependency-check-report.html',
+                             allowEmptyArchive: true
         }
     }
 }
