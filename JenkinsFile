@@ -56,6 +56,20 @@ stage('SCA - OWASP Dependency-Check') {
                 sh 'mvn -B -DskipTests=true compile'
     }
 }
+stage('SAST - SpotBugs') {
+    steps {
+        sh 'mvn -B spotbugs:spotbugs'
+    }
+    post {
+        always {
+            recordIssues(
+                tools: [
+                    spotBugs(pattern: 'target/spotbugsXml.xml')
+                ]
+            )
+        }
+    }
+}
   stage('Package') {
             steps {
                 sh 'mvn -B -DskipTests=true package'
