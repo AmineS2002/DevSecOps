@@ -98,6 +98,42 @@ stage('SonarQube Analysis') {
                 sh 'docker build -t $DOCKER_IMAGE:latest .'
             }
         }
+        stage('Trivy Vulnerability Scan') {
+    steps {
+        sh '''
+            mkdir -p reports
+
+            trivy image \
+                --timeout 15m \
+                --format template \
+                --template "@contrib/html.tpl" \
+                --output reports/trivy-report.html \
+                amines2002/devsecops:latest
+
+            trivy image \
+                --timeout 15m \
+                --format json \
+                --output reports/trivy-report.json \
+                amines2002/devsecops:latest
+        '''
+    }
+}
+
+stage('Publish Trivy Report') {
+    steps {
+        publishHTML(target: [
+            reportName: 'Trivy Vulnerability Report',
+            reportDir: 'reports',
+            reportFiles: 'trivy-report.html',
+            keepAll: true,
+            alwaysLinkToLastBuild: true,
+            allowMissing: false
+        ])
+
+        archiveArtifacts artifacts: 'reports/trivy-report.json',
+                         fingerprint: true
+    }
+}
 
         stage('Login DockerHub') {
             steps {
