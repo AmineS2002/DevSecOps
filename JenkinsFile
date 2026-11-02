@@ -103,10 +103,14 @@ stage('SonarQube Analysis') {
         sh '''
             mkdir -p reports
 
+            curl -fsSL \
+                https://raw.githubusercontent.com/aquasecurity/trivy/v0.76.1/contrib/html.tpl \
+                -o reports/html.tpl
+
             trivy image \
                 --timeout 15m \
                 --format template \
-                --template "@contrib/html.tpl" \
+                --template "@reports/html.tpl" \
                 --output reports/trivy-report.html \
                 amines2002/devsecops:latest
 
