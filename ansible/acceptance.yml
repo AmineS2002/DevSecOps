@@ -1,0 +1,60 @@
+---
+- name: Acceptance - Infrastructure Configuration Verification
+  hosts: local
+  become: false
+  gather_facts: false
+
+  tasks:
+
+    - name: Check Docker installation
+      command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Display Docker version
+      debug:
+        var: docker_version.stdout
+
+    - name: Check Docker Compose installation
+      command: docker compose version
+      register: compose_version
+      changed_when: false
+
+    - name: Display Docker Compose version
+      debug:
+        var: compose_version.stdout
+
+    - name: Verify Docker Compose configuration exists
+      stat:
+        path: /var/lib/jenkins/workspace/DevSecOps/docker-compose.yml
+      register: compose_file
+
+    - name: Verify environment file exists
+      stat:
+        path: /opt/student-management/.env
+      register: env_file
+
+    - name: Verify required configuration files
+      assert:
+        that:
+          - compose_file.stat.exists
+          - env_file.stat.exists
+        fail_msg: "Required deployment configuration is missing."
+        success_msg: "Deployment configuration files exist."
+
+    - name: Check Student Management container
+      command: docker inspect student-management
+      register: container_check
+      changed_when: false
+
+    - name: Verify application container is running
+      command: docker inspect --format={{ '{{' }}.State.Status{{ '}}' }} student-management
+      register: container_status
+      changed_when: false
+
+    - name: Validate application container status
+      assert:
+        that:
+          - container_status.stdout == "running"
+        fail_msg: "Student Management container is not running."
+        success_msg: "Student Management container is running."
