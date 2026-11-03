@@ -150,26 +150,80 @@ stage('Publish Trivy Report') {
                 }
             }
         }
-         stage('Push Docker Image') {
+        /* stage('Push Docker Image') {
             steps {
                 sh 'docker push $DOCKER_IMAGE:latest'
             }
-        }
-        stage('Deploy with Docker Compose') {
-            steps {
-                sh '''
-                    docker compose \
-                      --env-file /opt/student-management/.env \
-                      -f "$WORKSPACE/docker-compose.yml" \
-                      pull
+        }*/
+        stage('Deploy Application with Docker Compose') {
+    steps {
+        sh '''
+            set -e
 
-                    docker compose \
-                      --env-file /opt/student-management/.env \
-                      -f "$WORKSPACE/docker-compose.yml" \
-                      up -d
-                '''
-            }
+            echo "Validating Docker Compose configuration..."
+
+            docker compose \
+                --env-file /opt/student-management/.env \
+                -f "$WORKSPACE/docker-compose.yml" \
+                config -q
+
+            echo "Pulling latest Docker image..."
+
+            docker compose \
+                --env-file /opt/student-management/.env \
+                -f "$WORKSPACE/docker-compose.yml" \
+                pull
+
+            echo "Starting Student Management application..."
+
+            docker compose \
+                --env-file /opt/student-management/.env \
+                -f "$WORKSPACE/docker-compose.yml" \
+                up -d
+
+            echo "Checking running containers..."
+
+            docker compose \
+                --env-file /opt/student-management/.env \
+                -f "$WORKSPACE/docker-compose.yml" \
+                ps
+
+            echo "Recent application logs..."
+
+            docker compose \
+                --env-file /opt/student-management/.env \
+                -f "$WORKSPACE/docker-compose.yml" \
+                logs --tail=50
+        '''
+    }
+}
+stage('Acceptance - Ansible Infrastructure Verification') {
+    steps {
+        sh '''
+            #!/bin/bash
+            set -o pipefail
+
+            mkdir -p "$WORKSPACE/reports"
+
+            cd "$WORKSPACE/ansible"
+
+            ansible-playbook \
+                -i inventory.ini \
+                acceptance.yml \
+                2>&1 | tee "$WORKSPACE/reports/ansible-acceptance-report.txt"
+        '''
+    }
+
+    post {
+        always {
+            archiveArtifacts(
+                artifacts: 'reports/ansible-acceptance-report.txt',
+                allowEmptyArchive: true,
+                fingerprint: true
+            )
         }
+    }
+}
 
 
 
