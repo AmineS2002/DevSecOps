@@ -199,8 +199,7 @@ stage('Publish Trivy Report') {
 }
 stage('Acceptance - Ansible Infrastructure Verification') {
     steps {
-        sh '''
-            #!/bin/bash
+        sh '''#!/bin/bash
             set -o pipefail
 
             mkdir -p "$WORKSPACE/reports"
