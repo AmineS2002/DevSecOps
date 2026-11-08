@@ -19,11 +19,7 @@ pipeline {
             }
         }
 
-        stage('Affichage de la date système') {
-            steps {
-                sh 'date'
-            }
-        }
+       
         stage('Clean') {
             steps {
                 sh 'mvn -B clean'
@@ -70,11 +66,6 @@ stage('SAST - SpotBugs') {
         }
     }
 }
-  stage('Package') {
-            steps {
-                sh 'mvn -B -DskipTests=true package'
-    }
-}
 stage('SonarQube Analysis') {
     steps {
         withCredentials([string(
@@ -93,6 +84,12 @@ stage('SonarQube Analysis') {
         }
     }
 }
+  stage('Package') {
+            steps {
+                sh 'mvn -B -DskipTests=true package'
+    }
+}
+
         stage('Build Docker Image') {
             steps {
                 sh 'docker build -t $DOCKER_IMAGE:latest .'
@@ -136,6 +133,58 @@ stage('Publish Trivy Report') {
 
         archiveArtifacts artifacts: 'reports/trivy-report.json',
                          fingerprint: true
+    }
+}
+stage('Nmap Deployment Security Scan') {
+    steps {
+        sh '''
+            set -e
+
+            echo "Starting Nmap deployment scan..."
+
+            mkdir -p reports/nmap
+
+            nmap -Pn -sV --reason \
+                -oN reports/nmap/deployment-scan.txt \
+                -oX reports/nmap/deployment-scan.xml \
+                192.168.50.4
+
+            echo "Nmap scan completed successfully."
+        '''
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'reports/nmap/*',
+                             allowEmptyArchive: true,
+                             fingerprint: true
+        }
+    }
+}
+stage('Acceptance - Ansible Infrastructure Verification') {
+    steps {
+        sh '''#!/bin/bash
+            set -o pipefail
+
+            mkdir -p "$WORKSPACE/reports"
+
+            cd "$WORKSPACE/ansible"
+
+            ansible-playbook \
+                -i inventory.ini \
+                acceptance.yml \
+                2>&1 | tee "$WORKSPACE/reports/ansible-acceptance-report.txt"
+        '''
+    }
+
+    post {
+        always {
+            archiveArtifacts(
+                artifacts: 'reports/ansible-acceptance-report.txt',
+                allowEmptyArchive: true,
+                fingerprint: true
+            )
+        }
     }
 }
 
@@ -197,32 +246,7 @@ stage('Publish Trivy Report') {
         '''
     }
 }
-stage('Acceptance - Ansible Infrastructure Verification') {
-    steps {
-        sh '''#!/bin/bash
-            set -o pipefail
 
-            mkdir -p "$WORKSPACE/reports"
-
-            cd "$WORKSPACE/ansible"
-
-            ansible-playbook \
-                -i inventory.ini \
-                acceptance.yml \
-                2>&1 | tee "$WORKSPACE/reports/ansible-acceptance-report.txt"
-        '''
-    }
-
-    post {
-        always {
-            archiveArtifacts(
-                artifacts: 'reports/ansible-acceptance-report.txt',
-                allowEmptyArchive: true,
-                fingerprint: true
-            )
-        }
-    }
-}
 
 
 

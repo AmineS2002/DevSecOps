@@ -1,10 +1,53 @@
+
 ---
-- name: Acceptance - Infrastructure Configuration Verification
+- name: Acceptance - Infrastructure Pre-Deployment Verification
   hosts: local
   become: false
-  gather_facts: false
+  gather_facts: true
+
+  vars:
+    compose_file: /var/lib/jenkins/workspace/DevSecOps/docker-compose.yml
+    env_file: /opt/student-management/.env
+    minimum_disk_bytes: 2147483648
+    minimum_memory_mb: 2048
 
   tasks:
+
+    # 1. Operating System Verification
+
+    - name: Display operating system information
+      debug:
+        msg:
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "Kernel: {{ ansible_kernel }}"
+          - "Architecture: {{ ansible_architecture }}"
+
+    - name: Verify minimum system memory
+      assert:
+        that:
+          - ansible_memtotal_mb | int >= minimum_memory_mb
+        fail_msg: "Insufficient system memory. Minimum required: 2 GB."
+        success_msg: "System memory is sufficient."
+
+    # 2. Disk Space Verification
+
+    - name: Check available root disk space
+      shell: "df -PB1 / | awk 'NR==2 {print $4}'"
+      register: disk_space
+      changed_when: false
+
+    - name: Validate available disk space
+      assert:
+        that:
+          - disk_space.stdout | int >= minimum_disk_bytes
+        fail_msg: "Less than 2 GB of free disk space."
+        success_msg: "Sufficient disk space available."
+
+    - name: Display available disk space
+      debug:
+        msg: "Available disk space: {{ (disk_space.stdout | int / 1073741824) | round(2) }} GB"
+
+    # 3. Docker Verification
 
     - name: Check Docker installation
       command: docker --version
@@ -15,6 +58,32 @@
       debug:
         var: docker_version.stdout
 
+    - name: Verify Docker service is active
+      command: systemctl is-active docker
+      register: docker_service
+      changed_when: false
+      failed_when: docker_service.stdout != "active"
+
+    - name: Verify Docker daemon connectivity
+      command: docker info
+      register: docker_info
+      changed_when: false
+
+    - name: Verify Docker storage directory
+      stat:
+        path: "{{ docker_info.stdout | regex_search('Docker Root Dir: (.+)', '\\1') | first }}"
+      register: docker_storage
+
+    - name: Validate Docker storage directory
+      assert:
+        that:
+          - docker_storage.stat.exists
+          - docker_storage.stat.isdir
+        fail_msg: "Docker storage directory is missing."
+        success_msg: "Docker storage directory is available."
+
+    # 4. Docker Compose Verification
+
     - name: Check Docker Compose installation
       command: docker compose version
       register: compose_version
@@ -24,37 +93,82 @@
       debug:
         var: compose_version.stdout
 
+    # 5. Deployment Configuration Verification
+
     - name: Verify Docker Compose configuration exists
       stat:
-        path: /var/lib/jenkins/workspace/DevSecOps/docker-compose.yml
-      register: compose_file
+        path: "{{ compose_file }}"
+      register: compose_file_stat
 
     - name: Verify environment file exists
       stat:
-        path: /opt/student-management/.env
-      register: env_file
+        path: "{{ env_file }}"
+      register: env_file_stat
 
-    - name: Verify required configuration files
+    - name: Validate required configuration files
       assert:
         that:
-          - compose_file.stat.exists
-          - env_file.stat.exists
-        fail_msg: "Required deployment configuration is missing."
+          - compose_file_stat.stat.exists
+          - compose_file_stat.stat.isreg
+          - env_file_stat.stat.exists
+          - env_file_stat.stat.isreg
+          - env_file_stat.stat.size | int > 0
+        fail_msg: "Required deployment configuration is missing or empty."
         success_msg: "Deployment configuration files exist."
 
-    - name: Check Student Management container
-      command: docker inspect student-management
-      register: container_check
-      changed_when: false
+    # 6. Environment File Security
 
-    - name: Verify application container is running
-      command: docker inspect --format={{ '{{' }}.State.Status{{ '}}' }} student-management
-      register: container_status
-      changed_when: false
-
-    - name: Validate application container status
+    - name: Verify environment file permissions
       assert:
         that:
-          - container_status.stdout == "running"
-        fail_msg: "Student Management container is not running."
-        success_msg: "Student Management container is running."
+          - (env_file_stat.stat.mode | string)[-1] == '0'
+        fail_msg: "Environment file has insecure permissions. Use chmod 600."
+        success_msg: "Environment file permissions are acceptable."
+
+    # 7. Docker Compose Configuration Validation
+
+    - name: Validate Docker Compose configuration
+      command:
+        argv:
+          - docker
+          - compose
+          - --env-file
+          - "{{ env_file }}"
+          - -f
+          - "{{ compose_file }}"
+          - config
+          - -q
+      register: compose_validation
+      changed_when: false
+
+    - name: Confirm Compose configuration validation
+      debug:
+        msg: "Docker Compose configuration is valid."
+
+    # 8. Docker Hub Connectivity
+
+    - name: Verify Docker Hub registry connectivity
+      uri:
+        url: https://registry-1.docker.io/v2/
+        method: GET
+        status_code:
+          - 200
+          - 401
+        timeout: 15
+      register: dockerhub_check
+
+    - name: Confirm Docker Hub connectivity
+      debug:
+        msg: "Docker Hub registry is reachable."
+
+    # 9. Final Infrastructure Verification
+
+    - name: Infrastructure verification summary
+      debug:
+        msg:
+          - "Infrastructure pre-deployment verification completed successfully."
+          - "Docker: {{ docker_version.stdout }}"
+          - "Compose: {{ compose_version.stdout }}"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "Available disk: {{ (disk_space.stdout | int / 1073741824) | round(2) }} GB"
+          - "Memory: {{ ansible_memtotal_mb }} MB"
