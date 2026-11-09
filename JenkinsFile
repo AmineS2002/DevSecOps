@@ -247,6 +247,36 @@ stage('Acceptance - Ansible Infrastructure Verification') {
     }
 }
 
+stage('OSSEC Host Security Verification') {
+    steps {
+        sh '''
+            set -e
+
+            echo "Starting OSSEC host security verification..."
+
+            mkdir -p reports/ossec
+
+            sudo -n /usr/local/sbin/ossec-jenkins-check \
+                > reports/ossec/ossec-report.txt
+
+            echo "OSSEC verification completed successfully."
+
+            cat reports/ossec/ossec-report.txt
+        '''
+    }
+
+    post {
+        always {
+            archiveArtifacts(
+                artifacts: 'reports/ossec/ossec-report.txt',
+                allowEmptyArchive: true,
+                fingerprint: true
+            )
+        }
+    }
+}
+
+
 
 
 
