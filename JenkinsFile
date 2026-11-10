@@ -210,39 +210,16 @@ stage('Acceptance - Ansible Infrastructure Verification') {
             set -e
 
             echo "Validating Docker Compose configuration..."
+            docker compose --env-file /opt/student-management/.env \
+                -f docker-compose.yml config -q
 
-            docker compose \
-                --env-file /opt/student-management/.env \
-                -f "$WORKSPACE/docker-compose.yml" \
-                config -q
-
-            echo "Pulling latest Docker image..."
-
-            docker compose \
-                --env-file /opt/student-management/.env \
-                -f "$WORKSPACE/docker-compose.yml" \
-                pull
-
-            echo "Starting Student Management application..."
-
-            docker compose \
-                --env-file /opt/student-management/.env \
-                -f "$WORKSPACE/docker-compose.yml" \
-                up -d
+            echo "Deploying locally built Docker image..."
+            docker compose --env-file /opt/student-management/.env \
+                -f docker-compose.yml up -d --pull never --force-recreate
 
             echo "Checking running containers..."
-
-            docker compose \
-                --env-file /opt/student-management/.env \
-                -f "$WORKSPACE/docker-compose.yml" \
-                ps
-
-            echo "Recent application logs..."
-
-            docker compose \
-                --env-file /opt/student-management/.env \
-                -f "$WORKSPACE/docker-compose.yml" \
-                logs --tail=50
+            docker compose --env-file /opt/student-management/.env \
+                -f docker-compose.yml ps
         '''
     }
 }
