@@ -253,6 +253,49 @@ stage('OSSEC Host Security Verification') {
     }
 }
 
+stage('Monitoring Verification - Prometheus') {
+    steps {
+        sh '''
+            set -e
+
+            echo "Checking Prometheus availability..."
+
+            curl -fsS http://localhost:9090/-/ready
+
+            echo "Waiting for Student Management target to become UP..."
+
+            for i in $(seq 1 12); do
+
+                RESULT=$(curl -sG \
+                    --data-urlencode 'query=up{job="student-management"}' \
+                    http://localhost:9090/api/v1/query)
+
+                STATUS=$(echo "$RESULT" | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+results = data.get("data", {}).get("result", [])
+if data.get("status") != "success" or not results:
+    print("DOWN")
+else:
+    print(results[0]["value"][1])
+')
+
+                if [ "$STATUS" = "1" ]; then
+                    echo "SUCCESS: Student Management is UP in Prometheus."
+                    exit 0
+                fi
+
+                echo "Application not yet detected as UP. Attempt $i/12"
+                sleep 5
+            done
+
+            echo "ERROR: Prometheus did not detect Student Management as UP."
+            exit 1
+        '''
+    }
+}
+
+
 
 
 
